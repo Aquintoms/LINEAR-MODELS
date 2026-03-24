@@ -1,0 +1,99 @@
+---
+title: "GROUP WORK"
+author: "ALPHA NUMERIC"
+date: "2026-03-24"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["longtable", "fvextra"]
+    keep_tex: true
+fontsize: 10pt
+header-includes:
+  - \usepackage{microtype}
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  - \sloppy
+geometry: "left=2cm, right=2cm, top=2cm, bottom=2cm"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 60),  # wrapping long code lines
+  comment = "#>",                       # cleaner output comments
+  fig.align = "center"                  # center all plots
+)
+
+options(width = 60)   # wrap R *output* at ~60 chars
+
+# Loading libraries
+library(tidyverse)
+library(transport)
+library(lpSolve)
+library(car)
+library(knitr) # for kable tables
+library(dplyr)
+library(gridExtra)
+library(ggplot2)
+#library(ggfortify)
+library(broom)
+#library(ggcorrplot)
+#library(corrr)
+library(corrplot)
+library(MASS)
+library(datarium)
+```
+
+We proceeded to load marketing data from the 'datarium' library.\
+
+```{r marketing data, echo=TRUE}
+data("marketing", package = "datarium")
+head(marketing)
+```
+
+Checking the names of the columns and some summary statistics.\
+
+```{r overview, echo=TRUE}
+names(marketing)
+dim(marketing)
+summary(marketing)
+```
+
+From the summary statistics, we were able to have a glimpse of our marketing dataset. It was evident that more budget was allocated to YouTube (176.45), than the rest of the marketing channels.\
+We proceeded to investigate if our linear model assumptions were violated. We began with the most prominent one which is the **Assumption of Normality**.\
+
+## Assumption of Normality checks
+
+From our data, it was evident that our dependent variable was *sales* as our independent variables were *YouTube*, *Facebook* and *News Paper*.\
+We began by use of a histogram. For the bin-width the range (Max - Min) from our summary statistics guided us.\
+
+```{r YouTube, echo = TRUE}
+ggplot(marketing, aes(x = youtube)) +
+  geom_histogram(binwidth = 20, fill = "blue", color = "black") + labs(title = "Histogram of YouTube", x = "YouTube", y = "Count")
+```
+
+The YouTube Histogram appeared to be bi-modal.\
+
+```{r Facebook, echo=TRUE}
+ggplot(marketing, aes(x = facebook)) +
+  geom_histogram(binwidth = 5, fill = "purple", color = "black") +
+  labs(title = "Histogram of Facebook", x = "Facebook", y = "Count")
+```
+
+The histogram was uni-modal and appeared to be mesokurtic.\
+
+```{r newspaper, echo=TRUE}
+ggplot(marketing, aes(x = newspaper)) +
+  geom_histogram(binwidth = 10, fill = "gold", color = "black") +
+  labs(title = "Histogram of Newspaper", x = "Newspaper", y = "Count")
+```
+
+The histogram was positively skewed as it had a longer tail towards the right.\
+
+```{r sales, echo=TRUE}
+ggplot(marketing, aes(x = sales)) + geom_histogram(binwidth = 3, fill = "red", color = "black") +
+  labs(title = "Histogram of Sales", x = "Sales", y = "Count")
+```
+
+The histogram appeared to be almost normally distributed.
