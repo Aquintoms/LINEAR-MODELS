@@ -48,5 +48,14 @@ ggplot(df) +
 ggplot(df) +
   geom_point(mapping = aes(x = log(person_income), y = log(loan_amnt)), alpha = 0.5, color = "green") + 
   geom_smooth(mapping = aes(x = log(person_income), y = log(loan_amnt)), alpha = 0.5, color = "black")
+
+# Stepwise
+# This is to view and determine the variables to be used for our model
+lm_min <- lm(person_income ~ 1, data = df)
+lm_max <- lm(person_income ~ ., data = df)
+
+step(lm_min, scope = list (lower = lm_min, upper = lm_max), direction = "forward")
+
+step(lm_max, scope = list(lower = lm_min, upper = lm_max, direction = "backward"))
              
              
