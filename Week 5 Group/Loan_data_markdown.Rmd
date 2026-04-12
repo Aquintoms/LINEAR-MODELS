@@ -1,0 +1,217 @@
+---
+title: "LOAN DATA ANALYSIS"
+author: "Wesley M. Gathua"
+date: "2026-04-12"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    extra_dependencies: ["longtable", "fvextra"]
+    keep_tex: true
+fontsize: 10pt
+header-includes:
+  - \usepackage{microtype}
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  - \sloppy
+geometry: "left=2cm, right=2cm, top=2cm, bottom=2cm"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 60),  # wrapping long code lines
+  comment = "#>",                       # cleaner output comments
+  fig.align = "center"                  # center all plots
+)
+
+options(width = 60)   # wrap R *output* at ~60 chars
+
+# Loading libraries
+library(tidyverse)
+library(transport)
+library(lpSolve)
+library(car)
+library(knitr)       # for kable tables
+```
+
+This is my attempt to investigate the Loan Data as I try to see the patterns and the distribution that govern this dataset.
+
+```{r, echo=TRUE}
+# Loading the data to R
+df <- read.csv("C:/Users/HP/OneDrive - Strathmore University/STRATH UNI/FIRST YEAR/SEMESTER III/UNITS/LINEAR MODELS/LINEAR-MODELS/Data/loan_data.csv")
+
+if (exists("df")) {
+  print ("Your Loan dataset has loaded successfully!")
+}
+```
+Upon loading the dataset successfully, I proceeded to conduct some investigations of the dataset to see what I am working with.
+
+```{r  echo=TRUE}
+# Checking for the numbers of rows and columns
+dim(df)
+print (strrep("*", 50))
+
+# Checking the names of the columns
+names(df)
+print (strrep("*", 50))
+
+# checking the first few rows
+View(df)
+print(strrep("*", 50))
+
+# Checking the data type of the various columns
+str(df)
+print (strrep("*", 50))
+
+# checking for null values
+colSums(is.na(df))
+print(strrep("*", 50))
+```
+Upon some of the initial investigations, it was determined that there were no null values in this dataset. There were 14 columns in this dataset for the 45000 rows. The next step was to conduct the summary statistics.\
+
+```{r summary statistics, echo=TRUE}
+summary(df)
+```
+From the summary statistics, there was some slight skewness amongst the columns. More pronounced skewness was seen at *person_income* and *loan_amnt*. The means of these variables were greater than the median. This indicated `positive skew`. Most of all columns seemed to show median and mean being close to each other. Assumption of normality would be investigated later on.\
+
+The next step was to establish the important features. My goal was to see the variables that well predict the *person_income*. This was selected to be the y(dependent) variable. In order to achieve this, the library `finalfit` was invoked. This aided in selecting the important features out of the remaining 13.\
+
+Just before this, from the `str(df)` earlier on when investigating the data types, some variables needed to be converted from character to categories. This is for the `finalfit` library to actually handle all the features.\
+
+```{r character to category, echo = TRUE}
+library(dplyr)
+df <- df|>mutate(across(where(is.character), as.factor))
+```
+Now checking the important features for predicting income:\
+
+```{r important features for pred. income, echo=TRUE }
+library(dplyr) # goes together with finalfit
+library(finalfit) # main library
+
+dependent <- "person_income"
+explanatory <- names(df)[names(df) != dependent] # selecting all other columns
+
+results <- df |> finalfit(dependent, explanatory) # passing the data into the finalfit function
+View(results)
+results |> knitr::kable(caption = "Multivariable Linear Regression of a person's income") # table for R markdown
+
+results_summary <- df |> summary_factorlist(dependent, explanatory) # summary of the finalfit research
+results_summary |> knitr::kable(caption = "Summary Factor List")
+```
+
+The above tables provided a deeper understanding of the `loans dataset`.\
+The following was deduced:\
+**(i) Summary Factor List Table**\
+
+a) Some of the columns exhibited some outliers. The `person_age` column had a minimum age of 20 and a maximum of *144*. The `person_emp_exp` column had a minimum experience of 0 years and a maximum of *125* years. These outliers would greatly affect their respective means as well us lead to a violation of linearity assumptions. They would be taken care off in subsequent sections.\
+
+b) From the various means (averages) one is able to deduce which categories had more income as compared to the rest. For instance looking at the `person_education`, it was seen that people who have a Doctorate earn highly (\$87234.5) compared to the remaining levels of education such as Bachelor graduates (\$79703.3).
+
+**(ii) Multivariable Linear Regression of a person's income**\
+
+This is where much of the information was discovered.\
+
+a) Some of the columns were seen to be significant under the univariate coefficient column as they became less significant in the multivariate coefficient column. Looking at `person_gender`, under univariate statistics, it was seen that it was a significant column with its p-value at 0.031. The multivariate coefficient was 0.791. This meant that it was only significant being the **only** predictor but when all other variables are included and held constant, its effect reduces. It was not a significant predictor of a person's income.\
+
+b) Similar to the `Summary Factor List` table, it was evident that different categories had more income as compared to the rest. Observing `person_home_ownership` variable, `mortgage` being selected as the base, it was evident that mortgage owners had the highest income. The coefficients of both univariate and multivariate analysis exhibited the rest having negative values indicating that they were below the baseline `mortgage`. Looking at the statistical significance under univariate, owning a house (`own`) and renting (`rent`) had a low p-value ($< 0.05$) indicating that they greatly affected `person_income`.\
+
+The table below presents the significant variables as per the p-values from the univariate analysis. This is because some of these variables could be having some correlation with other variables making the p-values of their multivariate analysis be high. This was to prevent deletion of variables pre-maturely.\
+
+```{r significance table, echo = TRUE}
+variables <- c("person_age", "person_gender", "person_education", "person_emp_exp", "person_home_ownership", "loan_amnt", "loan_intent", "loan_percent_income", "cb_person_cred_hist_length", "credit_score", "previous_loan_defaults_on_file", "loan_status")
+univariate_p_values <- c("p<0.001", "p=0.031", "p=0.046 (Doctorate)","p<0.001", "p<0.001 (OWN & RENT)", "p<0.001", "p<0.001", "p<0.001", "p<0.001", "p<0.001", "p<0.001", "p<0.001")
+
+significance_table <- data.frame(Variable = variables, Univariate_p_value = univariate_p_values)
+
+print (significance_table)
+```
+The next logical step was to build a linear regression model. This was done before checking model assumptions. This is because the assumptions are based on the residuals. The mathematical formula for getting the residuals is:\
+
+$e = Y - \hat{Y}$, where $\hat{Y}$ is the predicted value.\
+
+This is is why the next step was to get the predicted value.\
+
+```{r initial lm model, echo=TRUE}
+initial_model <- lm(person_income ~ person_age + person_gender + person_education + person_emp_exp + person_home_ownership + loan_amnt + loan_intent + loan_percent_income + cb_person_cred_hist_length + credit_score + previous_loan_defaults_on_file + loan_status, data = df)
+
+summary(initial_model)
+```
+9 variables were significant as their p-values was < 0.05.\
+The subsequent step was to investigate if the assumptions of linearity were violated.\
+
+```{r linearity assumptions check, echo = TRUE}
+plot (initial_model)
+
+```
+
+**1. Residuals vs Fitted Plot**\
+
+The data points begin being well concentrated on the red-dashed line as they deviate from it going right. This shows the `violation of homoskedasticity`. The variance tends to increase.\
+The red-dashed line is relatively flat. This indicates that there was `no violation of the linearity assumption`.\
+
+**2. Q-Q Residuals**\
+
+The data points are relatively on the dashed line but curve upwards as you move to the right. This shows a `violation of normality` as there is a positive skew.\
+
+**3. Scale-Location**\
+
+This backs up our earlier statement on the `violation of homoskedasticity`. The red-dashed line is curved upwards indicating heteroskedasticity.\
+
+**4. Residuals vs Fitted**\
+
+This shows that there were outliers in the dataset as they are well outside the cook's distance.\
+
+Initially, we discovered some 'spurious' data in the sense that we saw a person's age to be 144 and a person who had an experience of 125 years. This were removed (as shown below) to prevent having unreliable results.\
+
+```{r clean_data, echo=TRUE}
+df_clean <- df |> filter(person_age < 100, person_emp_exp < 70)
+
+# Checking number of rows that were deleted
+nrow(df) - nrow(df_clean)
+```
+
+8 rows were omitted.\
+We proceeded to conduct a log transformation of the dependent variable `person_income`.\
+
+```{r log transformation, echo = TRUE}
+log_model <- lm(log(person_income) ~ person_age + person_gender + person_education + person_emp_exp + person_home_ownership + loan_amnt + loan_intent + loan_percent_income + cb_person_cred_hist_length + credit_score + previous_loan_defaults_on_file + loan_status, data = df_clean)
+
+summary(log_model)
+```
+Both the Multiple and Adjusted R-Squared doubled. Initially, the model could only explain 30.85% of variation but upon log transformation of our dependent variable and cleaning our data, our model explains 76.77% of the variation. Approximately 30% of the variation are explained by other factors not in the model. The next step was to conduct stepwise selection. This is to provide the optimum model with the most suitable variables.\
+
+```{r stepwise selection, echo=TRUE}
+optimum_model <- step(log_model, direction = "both")
+
+summary(optimum_model)
+```
+
+The optimum model was determined to be:\
+
+Dependent Variable: log(person_income)\  
+
+Independent Variables: person_age + person_emp_exp + person_home_ownership + loan_amnt + loan_intent + loan_percent_income + loan_status\
+
+Since the dependent variable was log transformed, the coefficients are to be read in percentage notation. For instance, a one year increase in a person's age results to 0.473% increase in their income if all other factors are held constant. Interestingly, the `person_emp_exp` had a negative coefficient. This explained that a one year increase in a person's work experience results into a 0.1788% decrease in their income. This seemed to be inconsistent with real world scenarios. A possible explanation of this would be `multicollinearity`. This was investigated below:\
+
+```{r multicollinearity, echo=TRUE}
+vif(optimum_model)
+```
+
+It was determined that `person_age` and `person_emp_exp` were highly overlapping  due to both features explaining the same thing thus the unrealistic explanation above. To mitigate this, feature engineering was conducted to remove them as a new variable was created.\
+
+```{r feature engineering, echo=TRUE}
+df_engineered <- df_clean |> mutate(age_began_work = person_age - person_emp_exp) |>
+  select(-person_age, -person_emp_exp) # deleting the 2 variables
+
+# Conducting the new linear regression model
+optimum_model2 <- lm(log(person_income) ~ age_began_work + person_home_ownership+loan_amnt+loan_intent+loan_percent_income+loan_status, data = df_engineered)
+
+summary(optimum_model2)
+
+# Checking for multicollinearity
+vif(optimum_model2)
+```
+
+Multicollinearity was handled as the VIF of each variable was 1.

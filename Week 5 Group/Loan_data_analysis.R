@@ -57,5 +57,7 @@ lm_max <- lm(person_income ~ ., data = df)
 step(lm_min, scope = list (lower = lm_min, upper = lm_max), direction = "forward")
 
 step(lm_max, scope = list(lower = lm_min, upper = lm_max, direction = "backward"))
-             
+
+
+            
              
