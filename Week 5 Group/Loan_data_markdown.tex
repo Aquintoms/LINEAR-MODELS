@@ -1309,6 +1309,42 @@ variable was created.\\
 #> loan_status           1.288139  1        1.134962
 \end{verbatim}
 
-Multicollinearity was handled as the VIF of each variable was 1.
+Multicollinearity was handled as the VIF of each variable was 1.\\
+
+The project proceeded to Machine Learning whereby there was need to
+predict an individual's income based on the variables we had. This was
+done using the linear regression model.\\
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)  }\CommentTok{\# for reproducibility}
+
+\NormalTok{sample\_size }\OtherTok{\textless{}{-}} \FunctionTok{floor}\NormalTok{(}\FloatTok{0.8} \SpecialCharTok{*} \FunctionTok{nrow}\NormalTok{(df\_engineered))  }\CommentTok{\# setting up the size for train}
+
+\NormalTok{train\_indices }\OtherTok{\textless{}{-}} \FunctionTok{sample}\NormalTok{(}\FunctionTok{seq\_len}\NormalTok{(}\FunctionTok{nrow}\NormalTok{(df\_engineered)), }\AttributeTok{size =}\NormalTok{ sample\_size)}
+
+\NormalTok{train\_data }\OtherTok{\textless{}{-}}\NormalTok{ df\_engineered[train\_indices, ]}
+\NormalTok{test\_data }\OtherTok{\textless{}{-}}\NormalTok{ df\_engineered[}\SpecialCharTok{{-}}\NormalTok{train\_indices, ]}
+
+\CommentTok{\# Training the data}
+\NormalTok{linear\_model }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(}\FunctionTok{log}\NormalTok{(person\_income) }\SpecialCharTok{\textasciitilde{}}\NormalTok{ age\_began\_work }\SpecialCharTok{+}\NormalTok{ person\_home\_ownership }\SpecialCharTok{+}
+\NormalTok{    loan\_amnt }\SpecialCharTok{+}\NormalTok{ loan\_intent }\SpecialCharTok{+}\NormalTok{ loan\_percent\_income }\SpecialCharTok{+}\NormalTok{ loan\_status,}
+    \AttributeTok{data =}\NormalTok{ train\_data)}
+
+\NormalTok{log\_predictions }\OtherTok{\textless{}{-}} \FunctionTok{predict}\NormalTok{(linear\_model, }\AttributeTok{newdata =}\NormalTok{ test\_data)  }\CommentTok{\# testing the data}
+
+\NormalTok{dollar\_predictions }\OtherTok{\textless{}{-}} \FunctionTok{exp}\NormalTok{(log\_predictions)  }\CommentTok{\# This is because our predictions are in natural logarithms}
+
+\NormalTok{actual\_income }\OtherTok{\textless{}{-}}\NormalTok{ test\_data}\SpecialCharTok{$}\NormalTok{person\_income}
+
+\NormalTok{linearity\_rmse }\OtherTok{\textless{}{-}} \FunctionTok{sqrt}\NormalTok{(}\FunctionTok{mean}\NormalTok{((actual\_income }\SpecialCharTok{{-}}\NormalTok{ dollar\_predictions)}\SpecialCharTok{\^{}}\DecValTok{2}\NormalTok{))  }\CommentTok{\# Calculating RMSE}
+
+\FunctionTok{print}\NormalTok{(linearity\_rmse)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+#> [1] 51087
+\end{verbatim}
 
 \end{document}

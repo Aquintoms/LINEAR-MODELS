@@ -214,4 +214,32 @@ summary(optimum_model2)
 vif(optimum_model2)
 ```
 
-Multicollinearity was handled as the VIF of each variable was 1.
+Multicollinearity was handled as the VIF of each variable was 1.\
+
+The project proceeded to Machine Learning whereby there was need to predict an individual's income based on the variables we had. This was done using the linear regression model.\
+
+```{r  ML_linear model, echo = TRUE}
+set.seed(123) # for reproducibility
+
+sample_size <- floor(0.80 * nrow(df_engineered)) # setting up the size for train
+
+train_indices <- sample(seq_len(nrow(df_engineered)), size = sample_size)
+
+train_data <- df_engineered[train_indices, ] 
+test_data <- df_engineered[-train_indices, ]
+
+# Training the data 
+linear_model <- lm(log(person_income) ~ age_began_work + person_home_ownership+loan_amnt+loan_intent+loan_percent_income+loan_status, data = train_data)
+
+log_predictions <- predict(linear_model, newdata = test_data) # testing the data
+
+dollar_predictions <- exp(log_predictions) # This is because our predictions are in natural logarithms
+
+actual_income <- test_data$person_income
+
+linearity_rmse <- sqrt(mean((actual_income - dollar_predictions)^2)) # Calculating RMSE
+
+print(linearity_rmse)
+
+```
+
