@@ -212,6 +212,56 @@ corrplot(
 There were highly strong correlations amongst certain variables such as total_rooms, total_bedrooms, population and households.\
 We also saw a relatively strong correlation between median_income and median_house_value.\
 
+We then generated the final fit summary table which informed us of the important variables influencing the median house prices.\
+
+```{r finalfit-summary-table}
+# Loading required formatting packages
+library(finalfit)
+library(kableExtra)
+library(dplyr)
+
+# 1. Creating categorical dependent variable using existing 'clean_data'
+summary_data <- clean_data %>%
+  mutate(
+    house_value_group = ntile(median_house_value, 4) %>%
+      factor(labels = c("Low", "Medium", "High", "Very High"))
+  )
+
+# 2. Defining dependent and explanatory variables
+dependent <- "house_value_group"
+
+# Selecting all columns except targets and geographical coordinates
+explanatory <- summary_data %>%
+  select(-median_house_value, -house_value_group, -longitude, -latitude) %>%
+  names()
+
+# 3. Creating the summary factorlist
+table1 <- summary_data %>%
+  summary_factorlist(
+    dependent = dependent,
+    explanatory = explanatory,
+    p = TRUE,              # Includes p-values for statistical differences
+    cont = "median",       # Used median for continuous variables (handles skewness well)
+    column = TRUE,
+    total_col = TRUE,
+    na_include = TRUE
+  )
+
+# 4. Rendering as a formatted HTML table
+table1 %>%
+  kbl(
+    caption = "Table 1: Summary Statistics by House Value Quartile",
+    align = "lcccccc",
+    booktabs = FALSE
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "bordered", "hover"),
+    full_width = FALSE
+  ) %>%
+  row_spec(0, bold = TRUE)
+```
+The above variables had p-values less than 0.05 thus proving to be significant.\
+
 ## Geographic Distribution
 
 ```{r eda-geo, fig.height=6}
@@ -990,7 +1040,9 @@ print(loess_1d_metrics)
 
 **Interpretations and Discussions**\
 1. The Univariate LOESS function gave a RMSE of 70879 which was higher than the previous smoothing splines. This is because it is a single predictor model and does not tell us much information about the location, age or any other influential variation.\
+
 2. The R2 was 0.455 which meant that income accounted for 45.5\% of the variation as 54.5\% of variations could be explained by other factors.\
+
 3. The LOESS univariate plot established what we saw from previous plots that as income increases, people tend to live in expensive neighbourhoods.\
 
 We then constructed a multivariate LOESS model:\
@@ -1158,33 +1210,6 @@ The Variable Importance plot confirms that `median_income` is by far the most cr
 
 `population_per_household` emerges as the second most vital feature, reflecting the heavy impact of neighborhood density on California real estate pricing. Permuting this variable causes a substantial 70% increase in prediction error.\
 
-We then plotted partial dependence plots of the two top features.\
-
-```{r rf-pdp, fig.height=5, fig.width=10}
-# Partial Dependence Plots for top 2 features
-library(pdp)
-
-pd_income <- partial(rf_model, pred.var = "median_income",
-                     train = X_train, grid.resolution = 30)
-
-
-pd_population <- partial(rf_model, pred.var = "population_per_household",
-                         train = X_train, grid.resolution = 30)
-
-p_income <- autoplot(pd_income, smooth = TRUE) +
-  labs(title = "PDP: Median Income (RF)", x = "Income (scaled)", y = "Fitted Value") +
-  theme_minimal()
-
-p_pop <- autoplot(pd_population, smooth = TRUE) +
-  labs(title = "PDP: Population per Household", x = "Population (scaled)", y = "Fitted Value") +
-  theme_minimal()
-
-p_income + p_pop
-```
-
-**Interpretations and Discussions**\
-1. The Income S-Curve (Cross-Model Validation): The PDP for `median_income` reveals a distinct non-linear S-curve. Property values remain baseline at low income levels, experience an aggressive, near-linear surge as scaled income rises from -1 to 3, and ultimately peak near $325,000 at a scaled income of 4. Remarkably, this exact geometric profile perfectly mirrors our earlier univariate LOESS curve proving the undeniable non-linear relationship.\
-2. The Population Threshold Effect: The PDP for `population_per_household` uncovers a stark "crowding penalty" in the California market. At near-zero scaled values, predicted home values sit at a premium near $ 230,000. However, as household density increases slightly toward a scaled value, home values take a severe, near-vertical plunge to $170,000, reflecting the lower market valuation of heavily overcrowded tracts. Once this initial threshold is crossed, the curve completely flatlines all the way out to a value of 100. This mathematically demonstrates that household overcrowding has a strict binary threshold effect rather than a continuous linear penalty.\
 
 The project now proceeded to XG Boost.\
 ------------------------------------------------------------------------
@@ -1316,36 +1341,246 @@ Our tenth and final model explored a Neural Network to observe how a network of 
 The project evaluated he California housing market through a series of frameworks, transitioning from  parametric baselines from linear models to Generalized Additive Models and finally to tree-based models and neural networks. This was to determine the optimal approach for modeling complex spatial and demographic data.\
 
 *1. Can we predict house prices more accurately using an ensemble of nonlinear models? (e.g., Random Forest, XGBoost, Neural Nets).*\
-We can definitely state that the tree-based non-linear ensembles provided better and superior accuracy in predicting house prices. Our Generalized Additive model captured 72.6\% of the variance as the gradient boost ensemble captured a whooping variation of about 83.4\%, the highest of the models.\
+We can definitively state that the tree-based non-linear ensembles provided better and superior accuracy in predicting house prices. Our Generalized Additive model captured 72.6\% of the variance as the gradient boost ensemble captured a whooping variation of about 83.4\%, the highest of the models.\
 
 It is also worth noting that not all non-linear ensembles would excel in non-linear data. An example is our model 10's neural network that somewhat struggled and gave us a R-squared of 68.9\%. This informed us that the tree based algorithms excel in partitioning abrupt geographical step functions as compared to neural networks which over smooth the spatial topography.\
 
-*What are the most important nonlinear interactions between location and income?*
+*What are the most important nonlinear interactions between location and income?*\
 It was evident that location and income were the key drivers of the house prices. Our GAM model proved this via the tensor product whereby the combination of both latitude and median_income, yielded a very low p-value informing us that it was significant.\
 
 The XG Boost feature importance (Gain) plot demonstrated that once the model utilizes spatial coordinates (longitude and latitude) to isolate premium coastal regions, the value of neighborhood density (population_per_household) largely vanishes. This informed us that high income only yielded high house prices when combined with highly specific coordinates, especially in the Coastal areas. This was also confirmed by our 3D spatial map.\
+
+Interaction between income and location is also made manifest by the following plots, beginning with the latitude focused (North-South) followed by longitude focused (East-West):\
+
+```{r rq1-income-lat, fig.height=6, fig.width=10}
+library(ggplot2)
+library(dplyr)
+
+# Creating regional cuts
+clean_data <- clean_data %>%
+  mutate(
+    lat_region  = cut(latitude, breaks = 4,
+                      labels = c("South (SoCal)", "Central-S", "Central-N", "North (Bay Area)")),
+    # Longitude in CA is negative. Smallest (-124) is West (Coast), Largest (-114) is East (Inland).
+    long_region = cut(longitude, breaks = 4,
+                      labels = c("Coastal", "Near-Coast", "Inland", "Far Inland")) 
+  )
+
+ggplot(clean_data, aes(x = median_income, y = median_house_value / 1e3, color = lat_region)) +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 1.3, span = 0.5) +
+  scale_color_viridis_d(name = "Latitude Region") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title    = "Income–House Value Relationship by Latitude Region",
+    subtitle = "Non-parallel slopes confirm a significant income × latitude interaction",
+    x = "Median Income (tens of $K)", 
+    y = "Median House Value ($K)"
+  ) +
+  theme(plot.title = element_text(face = "bold"))
+```
+This continues to validate the non-linearity aspect of our data as the S-Curves become more pronounced.\
+Looking into `SoCal` for instance, the plot shows how wealth (income) scales the prices of houses. More income results to a corresponding increase in house prices.\
+
+```{r rq1-income-coast, fig.height=6, fig.width=10}
+ggplot(clean_data, aes(x = median_income, y = median_house_value / 1e3, color = long_region)) +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 1.3, span = 0.5) +
+  scale_color_viridis_d(option = "C", name = "Coastal Proximity") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title    = "Income–House Value Relationship by Coastal Proximity",
+    subtitle = "Coastal areas show steeper income gradients — superadditive premium",
+    x = "Median Income (tens of $K)", 
+    y = "Median House Value ($K)"
+  ) +
+  theme(plot.title = element_text(face = "bold"))
+```
+As expected, the `Coastal` curve exhibited an aggressive elevation as income increased, pulling away from the other regions. It also informed us that having a high income, especially in the `far inland` region does not rapidly increase the house prices. This may be bring a nuance that Coastal houses are more desired (high demand) than the far inland houses thus driving prices up.\
 
 *2. Which model (GNPR (e.g. GAM, Kernel Regression, Splines) vs. parametric regression vs. machine learning) provides the best predictive accuracy for the given dataset (in predicting California housing prices) ?*\
 
 
 ```{r model-comparison-table}
 library(dplyr)
-library(knitr)
+library(stringr)
+library(kableExtra)
 
-# 1. Combining tracked metrics and ensure columns are unlisted cleanly
-final_summary <- bind_rows(all_metrics) %>%
-  arrange(RMSE)
+results_df <- bind_rows(all_metrics) %>%
+  arrange(RMSE) %>%
+  mutate(
+    Family = case_when(
+      str_detect(Model, "Linear|Ridge|Poly|Step") ~ "Parametric Baseline",
+      str_detect(Model, "Spline|Smooth|Local|GAM") ~ "GNPR",
+      str_detect(Model, "Forest|XGBoost|Neural") ~ "ML Ensemble",
+      TRUE ~ "Other"
+    ),
+    Rank = row_number()
+  ) %>%
+  select(Rank, Model, Family, RMSE, MAE, R2)
 
-
-kable(
-  final_summary, 
-  digits = c(0, 0, 0, 4),               # Integers for errors, 4 decimals for R²
-  format.args = list(big.mark = ","),   # Adds clean commas to currency values
-  align = c("l", "r", "r", "r"),         # Left-align text; Right-align numbers
-  caption = "Comprehensive Cross-Model Performance Evaluation",
-  col.names = c("Model Architecture", "Test RMSE ($)", "Test MAE ($)", "R-squared (R²)")
-)
+results_df %>%
+  kbl(
+    caption   = "Model Performance Comparison (Test Set)",
+    col.names = c("Rank", "Model", "Family", "RMSE ($)", "MAE ($)", "R²"),
+    digits    = c(0, 0, 0, 0, 0, 4),
+    format.args = list(big.mark = ","), # Keeps the thousands commas
+    align     = "cllccc"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "bordered"),
+    full_width  = FALSE,
+    font_size   = 13
+  ) %>%
+  row_spec(1, bold = TRUE, background = "#e6f4ea", color = "#155724") %>%  # Highlights #1 winner in green (XGBoost)
+  row_spec(which(results_df$Family == "Parametric Baseline"), background = "#fff3cd") %>% # Yellow for Parametric
+  row_spec(which(results_df$Family == "GNPR"), background = "#cfe2ff") %>% # Blue for GNPR
+  column_spec(4, bold = TRUE) # Bold the RMSE column
 ```
 
 From the table above, XGBoost achieved the highest predictive accuracy. It minimized the Root Mean Squared Error to 39173 outperforming all other models. This meant that when predicting the House prices, it was off by $39173.\
+
+Below is a side by side comparison of the models' `RMSE` and `R2`.\
+
+```{r comparison-bar, fig.height=6, fig.width=12}
+library(ggplot2)
+library(patchwork)
+library(scales)
+
+family_colors <- c("Parametric Baseline" = "#f39c12", "GNPR" = "#2e6da4", "ML Ensemble" = "#27ae60")
+
+# 1. Building the RMSE Plot
+p_rmse <- results_df %>%
+  ggplot(aes(x = reorder(Model, -RMSE), y = RMSE, fill = Family)) +
+  geom_col(width = 0.7, alpha = 0.9) +
+  geom_text(aes(label = scales::comma(RMSE)), hjust = -0.1, size = 3.2) +
+  coord_flip(clip = "off") +
+  scale_fill_manual(values = family_colors) +
+  scale_y_continuous(limits = c(0, max(results_df$RMSE) * 1.15),
+                     labels = scales::comma) +
+  theme_minimal() +
+  labs(title = "RMSE by Model (lower is better)",
+       x = NULL, y = "RMSE ($)") +
+  theme(legend.position = "none", plot.title = element_text(face = "bold"))
+
+# 2. Building the R-Squared Plot
+p_r2 <- results_df %>%
+  ggplot(aes(x = reorder(Model, RMSE), y = R2, fill = Family)) +
+  geom_col(width = 0.7, alpha = 0.9) +
+  geom_text(aes(label = round(R2, 3)), hjust = -0.1, size = 3.2) +
+  coord_flip(clip = "off") +
+  scale_fill_manual(values = family_colors, name = "Model Family") +
+  scale_y_continuous(limits = c(0, 1.1), labels = scales::percent) +
+  theme_minimal() +
+  labs(title = "R² by Model (higher is better)",
+       x = NULL, y = "R²") +
+  theme(legend.position = "right", plot.title = element_text(face = "bold"))
+
+# 3. Combining side-by-side using patchwork
+p_rmse + p_r2
+```
+The plot below showed the robustness of the tree based models as they had the better fit of them all.\
+
+```{r pred-vs-actual, fig.height=10, fig.width=12}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(scales)
+
+# Compiling predictions
+preds_df <- tibble(
+  Actual              = y_test,
+  `Linear\nRegression`= all_preds$LinearRegression,
+  `Polynomial\nReg`   = all_preds$PolynomialRegression,
+  `Step\nFunction`    = all_preds$StepFunction,
+  `B-Spline`          = all_preds$BSpline,
+  `Smoothing\nSpline` = all_preds$SmoothingSpline,
+  `Local Reg\n(LOESS)`= all_preds$LocalRegression,
+  GAM                 = all_preds$GAM,
+  `Random\nForest`    = all_preds$RandomForest,
+  XGBoost             = all_preds$XGBoost,
+  `Neural\nNetwork`   = all_preds$NeuralNet
+) %>%
+  pivot_longer(-Actual, names_to = "Model", values_to = "Predicted")
+
+# scatter plot
+ggplot(preds_df, aes(x = Actual, y = Predicted, color = Model)) +
+  geom_point(alpha = 0.12, size = 0.4) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "black", linewidth = 0.7) +
+  facet_wrap(~Model, ncol = 4) +
+  scale_color_viridis_d(guide = "none") +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title    = "Actual vs. Predicted — All Models",
+    subtitle = "Dashed line = perfect prediction. Scatter closer to diagonal = better fit.",
+    x = "Actual House Value ($)", 
+    y = "Predicted House Value ($)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    strip.text = element_text(face = "bold", size = 11), 
+    panel.spacing = unit(1.5, "lines")                   
+  )
+```
+The plot below showed the success of the various models. A red curved LOESS line showed that the model struggled greatly as an almost straight line indicated that it successfully captures the non-linear geography.\
+
+```{r residuals, fig.height=10, fig.width=12}
+preds_df %>%
+  mutate(Residual = Actual - Predicted) %>%
+  ggplot(aes(x = Predicted, y = Residual, color = Model)) +
+  geom_point(alpha = 0.10, size = 0.4) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 0.8, color = "red") +
+  facet_wrap(~Model, ncol = 4, scales = "free_x") +
+  scale_color_viridis_d(guide = "none") +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title    = "Residual Plots — All Models",
+    subtitle = "Red LOESS line should be flat at zero for a well-specified model",
+    x = "Predicted Value ($)", 
+    y = "Residual ($)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    strip.text = element_text(face = "bold", size = 11),
+    panel.spacing = unit(1.5, "lines")
+  )
+```
+
+As expected, tree based models emerged superior with XGBoost proving to be robust.\
+
+We then finally compared the models in terms of their families as shown below:\
+
+```{r family-summary}
+library(dplyr)
+library(kableExtra)
+
+family_summary <- results_df %>%
+  group_by(Family) %>%
+  summarise(
+    `Best RMSE`  = min(RMSE),
+    `Mean RMSE`  = round(mean(RMSE), 0),
+    `Best R²`    = max(R2),
+    `n Models`   = n()
+  ) %>%
+  arrange(`Best RMSE`)
+
+family_summary %>%
+  kbl(
+    caption = "Performance Summary by Model Family",
+    format.args = list(big.mark = ","),  
+    digits = c(NA, 0, 0, 4, 0),          
+    align = "lrrrc"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "bordered"),
+    full_width = FALSE, 
+    font_size = 13
+  ) %>%
+  row_spec(1, bold = TRUE, background = "#e6f4ea", color = "#155724") # Highlights the best paradigm
+```
+
+Asanteni!
 ------------------------------------------------------------------------
